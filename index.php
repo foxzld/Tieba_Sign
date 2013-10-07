@@ -41,8 +41,10 @@ if(!$uid){
 			$cookie = daddslashes($_POST['cookie']);
 			if(!preg_match('/BDUSS=(.+?)/', $cookie)) showmessage('Cookie 信息不完整，请尝试重新获取', './#setting', 1);
 			if(!preg_match('/BAIDUID=(.+?)/', $cookie)) showmessage('Cookie 信息不完整，请尝试重新获取', './#setting', 1);
+			if(!verify_cookie($cookie)) showmessage('无法登陆百度贴吧，请检查 Cookie 是否填写正确', './#setting', 1);
 			$cookie = daddslashes($cookie);
 			DB::query("UPDATE member SET cookie='{$cookie}' WHERE uid='{$uid}'");
+			CACHE::update('cookie');
 			showmessage('您的 Cookie 信息已经更新<script type="text/javascript" src="?action=refresh_liked_tieba&formhash='.$formhash.'"></script>', './#setting', 1);
 			break;
 		case 'update_setting':
@@ -55,6 +57,7 @@ if(!$uid){
 				'zhidao_sign' => $_POST['zhidao_sign'] ? 1 : 0,
 				'wenku_sign' => $_POST['wenku_sign'] ? 1 : 0,
 				), "uid='{$uid}'");
+			CACHE::save('user_setting_'.$uid, '');
 			showmessage('设置已经保存', './#setting', 1);
 			break;
 		case 'change_password':

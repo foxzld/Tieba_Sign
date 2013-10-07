@@ -29,6 +29,7 @@ function daddslashes($string, $force = 0, $strip = FALSE) {
 	return $string;
 }
 function template($file){
+	HOOK::run("template_load_{$file}");
 	if(IN_MOBILE){
 		$mobilefile = ROOT."./template/mobile/{$file}.php";
 		if(file_exists($mobilefile)) return $mobilefile;
@@ -109,9 +110,7 @@ function authcode($string, $operation = 'DECODE', $key = '', $expiry = 0) {
 	}
 }
 function showmessage($msg = '', $redirect = '', $delay = 3){
-	if(IN_API){
-		exit($msg);
-	}elseif($_GET['format'] == 'json'){
+	if($_GET['format'] == 'json'){
 		$result = array('msg' => $msg, 'redirect' => $redirect, 'delay' => $delay);
 		echo json_encode($result);
 		exit();
@@ -286,89 +285,53 @@ function curl_get($url, $uid, $mobile_ua = false, $postdata = ''){
 function get_cookie($uid){
 	static $cookie = array();
 	if($cookie[$uid]) return $cookie[$uid];
-	return $cookie[$uid] = DB::result_first("SELECT cookie FROM member WHERE uid='{$uid}'");
+	$cookie = CACHE::get('cookie');
+	return $cookie[$uid];
 }
 function get_username($uid){
 	static $username = array();
 	if($username[$uid]) return $username[$uid];
-	return $username[$uid] = DB::result_first("SELECT username FROM member WHERE uid='{$uid}'");
+	$username = CACHE::get('username');
+	return $username[$uid];
 }
 function get_setting($uid){
 	static $user_setting = array();
 	if($user_setting[$uid]) return $user_setting[$uid];
-	return $user_setting[$uid] = DB::fetch_first("SELECT * FROM member_setting WHERE uid='{$uid}'");
+	$cached_result = CACHE::get('user_setting_'.$uid);
+	if(!$cached_result){
+		$cached_result = DB::fetch_first("SELECT * FROM member_setting WHERE uid='{$uid}'");
+		CACHE::save('user_setting_'.$uid, $cached_result);
+	}
+	return $user_setting[$uid] = $cached_result;
 }
-function send_mail($address, $subject, $message){
-	global $_config;
-	switch($_config['mail']['type']){
-		case 'kk_mail': return kk_mail($address, $subject, $message);
-		case 'bcms':	return bcms_mail($address, $subject, $message);
-		case 'saemail': return saemail($address, $subject, $message);
-		case 'mail':	return mail($address, $subject, $message);
-		case 'smtp':	return smtp_mail($address, $subject, $message);
-		default: return false;
+function send_mail($address, $subject, $message, $delay = true){
+	if($delay){
+		DB::insert('mail_queue', array(
+			'to' => $address,
+			'subject' => $subject,
+			'content' => $message,
+			));
+		saveSetting('mail_queue', 1);
+		return true;
+	}else{
+		require_once SYSTEM_ROOT.'./class/mail.php';
+		$mail = new mail_content();
+		$mail->address = $address;
+		$mail->subject = $subject;
+		$mail->message = $message;
+		$sender = new mailsender();
+		return $sender->sendMail($mail);
 	}
 }
-function bcms_mail($address, $subject, $message){
-	global $_config;
-	require_once SYSTEM_ROOT.'./class/bcms.php';
-	$bcms = new Bcms();
-    $ret = $bcms->mail($_config['mail']['bcms']['queue'], '<!--HTML-->'.$message, array($address), array(Bcms::MAIL_SUBJECT => $subject));
-    if (false === $ret) {
-        return false;
-    } else {
-        return true;
-    }
-}
-function smtp_mail($address, $subject, $message){
-	global $_config;
-	require_once SYSTEM_ROOT.'./class/smtp.php';
-	$smtp = new smtp();
-    return $smtp->send($address, $subject, $message);
-}
-function kk_mail($address, $subject, $message){
-	global $_config;
-	$data = array(
-		'to' => $address,
-		'title' => $subject,
-		'content' => $message,
-		'ver' => VERSION,
-	);
-	$path = authcode(serialize($data), 'ENCODE', $_config['mail']['kk_mail']['api_key']);
-	$ch = curl_init();
-	curl_setopt($ch, CURLOPT_URL, $_config['mail']['kk_mail']['api_path']);
-	curl_setopt($ch, CURLOPT_HEADER, 0);
-	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-	curl_setopt($ch, CURLOPT_POST, 1);
-	curl_setopt($ch, CURLOPT_POSTFIELDS, 'data='.urlencode($path));
-	$result = curl_exec($ch);
-	curl_close($ch);
-	return $result == 'ok';
-}
-function saemail($address, $subject, $message){
-	global $_config;
-	$mail = new SaeMail();
-	$mail->setOpt(array(
-		'from' => 'Mail-System <'.$_config['mail']['saemail']['address'].'>',
-		'to' => $address,
-		'smtp_host' => $_config['mail']['saemail']['smtp_server'],
-		'smtp_username' => $_config['mail']['saemail']['smtp_name'],
-		'smtp_password' => $_config['mail']['saemail']['smtp_pass'],
-		'subject' => $subject,
-		'content' => $message,
-		'content_type' => 'HTML',
-	));
-	$mail->send();
-	return true;
-}
 function getSetting($k, $force = false){
-	static $setting = array();
-	if(!$force && isset($setting[$k])) return $setting[$k];
-	return $setting[$k] = DB::result_first("SELECT v FROM setting WHERE k='{$k}'");
+	if($force) return $setting[$k] = DB::result_first("SELECT v FROM setting WHERE k='{$k}'");
+	$cache = CACHE::get('setting');
+	return $cache[$k];
 }
 function saveSetting($k, $v){
 	$v = addslashes($v);
 	DB::query("REPLACE INTO setting SET v='{$v}', k='{$k}'");
+	CACHE::update('setting');
 }
 function get_tbs($uid){
 	static $tbs = array();
@@ -382,4 +345,15 @@ function get_tbs($uid){
 	curl_close($ch);
 	$tbs = json_decode($tbs_json, 1);
 	return $tbs[$uid] = $tbs['tbs'];
+}
+function verify_cookie($cookie){
+	$tbs_url = 'http://tieba.baidu.com/dc/common/tbs';
+	$ch = curl_init($tbs_url);
+	curl_setopt($ch, CURLOPT_HTTPHEADER, array('User-Agent: Mozilla/5.0 (Linux; U; Android 4.1.2; zh-cn; MB526 Build/JZO54K) AppleWebKit/530.17 (KHTML, like Gecko) FlyFlow/2.4 Version/4.0 Mobile Safari/530.17 baidubrowser/042_1.8.4.2_diordna_458_084/alorotoM_61_2.1.4_625BM/1200a/39668C8F77034455D4DED02169F3F7C7%7C132773740707453/1','Referer: http://tieba.baidu.com/'));
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+	curl_setopt($ch, CURLOPT_COOKIE, $cookie);
+	$tbs_json = curl_exec($ch);
+	curl_close($ch);
+	$tbs = json_decode($tbs_json, 1);
+	return $tbs['is_login'];
 }

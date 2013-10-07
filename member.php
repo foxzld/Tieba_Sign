@@ -54,7 +54,7 @@ if($_GET['action'] == 'logout' && $_GET['hash']==$formhash){
 	$uid = DB::result_first("SELECT _uid FROM member_bind WHERE uid='{$uid}' AND _uid='{$target_uid}'");
 	if(!$uid) showmessage('您尚未绑定该账号，无法进行切换', './');
 	$username = get_username($uid);
-	dsetcookie('token', authcode("{$cookiever}\t{$uid}\t{$username}\t0", 'ENCODE'));
+	do_login($uid);
 	showmessage("您已经成功切换至 {$username}！", dreferer(), 1);
 }elseif($uid){
 	showmessage('您已经登录了~', dreferer(), 1);
@@ -74,6 +74,7 @@ if($_GET['action'] == 'logout' && $_GET['hash']==$formhash){
 		$username = daddslashes($_POST['username']);
 		$email = daddslashes($_POST['email']);
 		$user = DB::fetch_first("SELECT * FROM member WHERE username='{$username}' AND email='{$email}'");
+		if(!$user) showmessage('用户名 / 邮箱有误', './');
 		$info = array(
 			$user['uid'],			// UID
 			TIMESTAMP + 3600,		// Token 过期时间
@@ -122,7 +123,8 @@ EOF;
 				'email' => $email,
 			));
 			DB::insert('member_setting', array('uid' => $uid));
-			do_login($uid);
+			CACHE::update('username');
+			CACHE::save('user_setting_'.$uid, '');
 			showmessage("注册成功，您的用户名是 <b>{$username}</b> 记住了哦~！", dreferer(), 3);
 		}
 	}
