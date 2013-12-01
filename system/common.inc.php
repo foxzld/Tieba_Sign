@@ -4,14 +4,14 @@ define('IN_KKFRAME', true);
 define('SYSTEM_ROOT', dirname(__FILE__).'/');
 define('ROOT', dirname(SYSTEM_ROOT).'/');
 define('TIMESTAMP', time());
-define('VERSION', '1.13.10.20');
+define('VERSION', '1.13.11.9');
 
 if($_GET['debug']){
 	define('DEBUG_ENABLED', true);
 	error_reporting(E_ALL ^ E_NOTICE);
 }else{
 	define('DEBUG_ENABLED', false);
-	error_reporting(E_ERROR);
+	error_reporting(0);
 }
 require_once SYSTEM_ROOT.'./class/core.php';
 $system = new kk_sign();

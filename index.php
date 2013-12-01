@@ -1,8 +1,15 @@
 <?php
 require_once './system/common.inc.php';
 
-if(!$uid){
-	header('Location: member.php?action=login');
+if($_GET['action'] == 'cache'){
+	header('Content-Type: text/cache-manifest');
+	include template('appcache');
+	exit();
+}elseif($_GET['action'] == 'cache_frame'){
+	echo '<!DOCTYPE html><html manifest="index.php?action=cache"><head><title>HTML5 Application Cache</title></head><body><p>This page will be cached by your browser.</p></body></html>';
+	exit();
+}elseif(!$uid){
+	header('Location: member.php');
 	exit();
 }elseif($_GET['action']){
 	switch($_GET['action']){
@@ -22,17 +29,10 @@ if(!$uid){
 			showmessage('修改签到设置成功！');
 		case 'test_sign':
 			if($_GET['formhash'] != $formhash) break;
-			require_once SYSTEM_ROOT.'./function/sign.php';
 			$tieba = DB::fetch_first("SELECT * FROM my_tieba WHERE uid='{$uid}' ORDER BY RAND() LIMIT 0,1");
-			if(!$tieba) showmessage('没有喜欢的贴吧，请先刷新喜欢的贴吧列表', './#loved');
+			if(!$tieba) showmessage('没有喜欢的贴吧，请先刷新喜欢的贴吧列表', './#liked_tieba');
 			$setting = get_setting($uid);
-			if($setting['sign_method'] == 2){
-				list($status, $result, $exp) = mobile_sign($uid, $tieba);
-			}elseif($setting['sign_method'] == 3){
-				list($status, $result, $exp) = client_sign($uid, $tieba);
-			}else{
-				list($status, $result, $exp) = normal_sign($uid, $tieba);
-			}
+			list($status, $result, $exp) = client_sign($uid, $tieba);
 			$status = $status==2 ? '签到成功' : '签到失败';
 			showmessage("<p>测试贴吧：{$tieba[name]}</p><p>测试结果：{$status}</p><p>详细信息：{$result}</p>", './#setting', 1);
 			break;
@@ -42,7 +42,7 @@ if(!$uid){
 			CACHE::update('cookie');
 			DB::query("DELETE FROM my_tieba WHERE uid='{$uid}'");
 			DB::query("DELETE FROM sign_log WHERE uid='{$uid}'");
-			showmessage('已经解除百度账号绑定<br>您可以稍后重新进行绑定', './#baidu_bind', 1);
+			showmessage('已经解除百度账号绑定<br>您可以稍后重新进行绑定', './#baidu_bind#', 1);
 		case 'receive_cookie':
 			if(!$_GET['cookie']) break;
 			if($_GET['formhash'] != $formhash) break;
@@ -51,7 +51,7 @@ if(!$uid){
 			if(!verify_cookie($cookie)) showmessage('无法登陆百度贴吧，请尝试重新绑定', './#baidu_bind', 1);
 			DB::query("UPDATE member SET cookie='{$cookie}' WHERE uid='{$uid}'");
 			CACHE::update('cookie');
-			showmessage('绑定百度账号成功！<script type="text/javascript" src="?action=refresh_liked_tieba&formhash='.$formhash.'"></script>', './#baidu_bind', 1);
+			showmessage('绑定百度账号成功！<script type="text/javascript" src="?action=refresh_liked_tieba&formhash='.$formhash.'"></script><script type="text/javascript">try{ opener.load_guide_page(3); window.close(); }catch(e){}</script>', './#baidu_bind', 1);
 		case 'update_cookie':
 			if(!$_POST['cookie']) break;
 			$cookie = daddslashes($_POST['cookie']);
@@ -95,7 +95,7 @@ if(!$uid){
 		case 'refresh_liked_tieba':
 			if($formhash != $_GET['formhash']) showmessage('刷新中，请稍候...', '?action=refresh_liked_tieba&formhash='.$formhash, 0);
 			list($insert, $deleted) = update_liked_tieba($uid);
-			showmessage("喜欢的贴吧列表已经更新,<br>新增{$insert}个贴吧, 删除{$deleted}个贴吧", './#loved', 1);
+			showmessage("喜欢的贴吧列表已经更新,<br>新增{$insert}个贴吧, 删除{$deleted}个贴吧", './#liked_tieba', 1);
 			break;
 	}
 	header('Location: ./');

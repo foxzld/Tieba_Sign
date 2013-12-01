@@ -10,22 +10,25 @@ if(!defined('IN_ADMINCP')) exit();
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
 <meta name="author" content="kookxiang" />
 <meta name="copyright" content="KK's Laboratory" />
-<link rel="shortcut icon" href="/favicon.ico" />
+<link rel="shortcut icon" href="favicon.ico" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="renderer" content="webkit">
 <link rel="stylesheet" href="./style/main.css?version=<?php echo VERSION; ?>" type="text/css" />
+<link rel="stylesheet" href="./style/custom.css" type="text/css" />
 </head>
 <body>
 <div class="wrapper" id="page_index">
-<div id="append_parent"></div>
+<div id="append_parent"><div class="loading-icon"><img src="style/loading.gif" /> 载入中...</div></div>
 <div class="main-box clearfix">
 <h1>贴吧签到助手 - 管理中心</h1>
-<div class="loading-icon"><img src="style/loading.gif" /> 载入中...</div>
-<div class="menubtn">&nbsp;</div>
+<div class="menubtn"><p>-</p><p>-</p><p>-</p></div>
+<div class="main-wrapper">
 <div class="sidebar">
-<ul class="menu">
+<ul id="menu" class="menu">
 <li id="menu_user"><a href="#user">用户管理</a></li>
 <li id="menu_stat"><a href="#stat">用户签到统计</a></li>
-<li id="menu_config"><a href="#config">系统设置</a></li>
+<li id="menu_plugin"><a href="#plugin">插件管理</a></li>
+<li id="menu_setting"><a href="#setting">系统设置</a></li>
 <li id="menu_mail"><a href="#mail">邮件群发</a></li>
 <li id="menu_updater"><a href="http://update.kookxiang.com/gateway.php?id=tieba_sign&version=<?php echo VERSION; ?>" target="_blank" onclick="return show_updater_win(this.href)">检查更新</a></li>
 <li><a href="./">返回前台</a></li>
@@ -46,7 +49,7 @@ if(!defined('IN_ADMINCP')) exit();
 <tbody></tbody>
 </table>
 </div>
-<div id="content-config" class="hidden">
+<div id="content-setting" class="hidden">
 <h2>系统设置</h2>
 <form method="post" action="admin.php?action=save_setting" id="setting_form" onsubmit="return post_win(this.action, this.id)">
 <p>功能增强</p>
@@ -88,11 +91,37 @@ foreach($classes as $id=>$obj){
 <p><input type="submit" value="确认发送" /></p>
 </form>
 </div>
+<div id="content-plugin" class="hidden">
+<h2>插件管理</h2>
+<p>安装相关插件能够增强 贴吧签到助手 的相关功能.（部分插件可能会影响系统运行效率）</p>
+<p>插件的设计可以参考 Github 上的项目介绍.</p>
+<p>将插件文件放到 /plugins/ 文件夹下即可在此处看到对应的插件程序.</p>
+<table>
+<thead><tr><td style="width: 40px">#</td><td>插件标识符 (ID)</td><td>插件介绍</td><td>操作</td></tr></thead>
+<?php
+$i = 1;
+foreach($plugins as $plugin){
+	echo '<tr><td>'.$i++."</td><td>{$plugin[id]}</td><td>";
+	echo $plugin['obj']->description;
+	echo '</td><td>';
+	if($plugin['installed']){
+		if(method_exists($plugin['obj'], 'on_config')) echo '<a href="admin.php?action=config_plugin&pluginid='.$plugin['id'].'" class="link_config">设置</a> | ';
+		echo '<a href="admin.php?action=uninstall_plugin&pluginid='.$plugin['id'].'&formhash='.$formhash.'" class="link_uninstall">卸载</a>';
+	}else{
+		echo '<a href="admin.php?action=install_plugin&pluginid='.$plugin['id'].'&formhash='.$formhash.'" class="link_install">安装</a>';
+	}
+	echo '</td></tr>';
+}
+?>
+<tbody></tbody>
+</table>
 </div>
 </div>
-<p class="copyright">当前版本：<?php echo VERSION; ?> <?php if(MCACHE::isAvailable()) echo '- Memcached '; ?>- <a href="https://me.alipay.com/kookxiang" target="_blank">赞助开发</a><br>Designed by <a href="http://www.ikk.me" target="_blank">kookxiang</a>. 2013 &copy; <a href="http://www.kookxiang.com" target="_blank">KK's Laboratory</a><br>请勿擅自修改程序版权信息或将本程序用于商业用途！</p>
 </div>
-<script src="//libs.baidu.com/jquery/1.10.2/jquery.min.js"></script>
+</div>
+<p class="copyright">当前版本：<?php echo VERSION; ?> - <a href="https://me.alipay.com/kookxiang" target="_blank">赞助开发</a><br>Designed by <a href="http://www.ikk.me" target="_blank">kookxiang</a>. 2013 &copy; <a href="http://www.kookxiang.com" target="_blank">KK's Laboratory</a><br>请勿擅自修改程序版权信息或将本程序用于商业用途！</p>
+</div>
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
 <script type="text/javascript">
 var mobile = <?php echo IN_MOBILE ? '1' : '0'; ?>;
 var formhash = '<?php echo $formhash; ?>';

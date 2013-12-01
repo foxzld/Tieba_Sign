@@ -1,6 +1,5 @@
 <?php
 if(!defined('IN_KKFRAME')) exit();
-require_once SYSTEM_ROOT.'./function/sign.php';
 $date = date('Ymd', TIMESTAMP + 900);
 $count = DB::result_first("SELECT COUNT(*) FROM `sign_log` WHERE status IN (0, 1) AND date='{$date}'");
 if($count){
@@ -8,19 +7,13 @@ if($count){
 	$tid = DB::result_first("SELECT tid FROM `sign_log` WHERE status IN (0, 1) AND date='{$date}' LIMIT {$offset},1");
 	if(!$tid) exit();
 	$tieba = DB::fetch_first("SELECT * FROM my_tieba WHERE tid='{$tid}'");
-	if($tieba['skiped']){
+	if($tieba['skiped'] || !$tieba){
 		DB::query("UPDATE sign_log set status='-2' WHERE tid='{$tieba[tid]}' AND date='{$date}'");
 		continue;
 	}
 	$uid = $tieba['uid'];
 	$setting = get_setting($uid);
-	if($setting['sign_method'] == 2){
-		list($status, $result, $exp) = mobile_sign($uid, $tieba);
-	}elseif($setting['sign_method'] == 3){
-		list($status, $result, $exp) = client_sign($uid, $tieba);
-	}else{
-		list($status, $result, $exp) = normal_sign($uid, $tieba);
-	}
+	list($status, $result, $exp) = client_sign($uid, $tieba);
 	if($status == 2){
 		if($exp){
 			DB::query("UPDATE sign_log SET status='2', exp='{$exp}' WHERE tid='{$tieba[tid]}' AND date='{$date}'");
